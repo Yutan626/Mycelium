@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mycelium — Family History Tracker</title>
+  <meta name="description" content="Build your family tree, save stories, and explore where your family came from on a 3D globe.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!--
+  =====================================================================
+  HOOKS FOR BACKEND (server.js / script.js)
+  ---------------------------------------------------------------------
+  Everything lives in this one file. Four "views" are shown/hidden by
+  the URL hash:  #home  #add  #tree  #globe
+
+  FORMS
+    #member-form (Add page)      fields: name, birthDate, deathDate,
+                                 birthPlace, livedPlace, relationship,
+                                 relatedTo, photo, bio
+    #quick-form  (Tree side)     fields: name, birthDate, birthPlace,
+                                 relationship, relatedTo
+    Both have data-api="/api/members" (POST).
+
+  TREE
+    #tree-container   put nested <ul><li> with <button class="node"> here
+    #relatedTo / #quickRelatedTo   <select>s: fill with existing people
+
+  SIDE PANEL (Tree page)
+    #panel-profile  #panel-add  #panel-timeline  #panel-stories
+    #profile-name #profile-avatar #profile-dates #profile-place
+    #profile-relation #profile-bio
+    #timeline-list   <ul>   (GET /api/events)
+    #stories-list    <div>  (GET /api/stories)
+
+  GLOBE
+    #globe-container   (globe.gl renders here)
+    #globe-list        <ul> text version of the same places
+    GET /api/places should return [{ name, place, lat, lng }]
+
+  The small <script> at the bottom is a working demo of the above.
+  Move it into script.js and replace the sample data with fetch().
+  =====================================================================
+  -->
+
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="Mycelium, home">
+      <span class="brand-mark" aria-hidden="true">🌳</span> Mycelium
+    </a>
+    <nav class="main-nav" aria-label="Main">
+      <ul>
+        <li><a href="#home" data-nav="home">Home</a></li>
+        <li><a href="#add" data-nav="add">Add family</a></li>
+        <li><a href="#tree" data-nav="tree">Family tree</a></li>
+        <li><a href="#globe" data-nav="globe">Globe</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" tabindex="-1">
+
+    <!-- ===================== 1. INTRO ===================== -->
+    <section id="view-home" class="view" aria-labelledby="home-title">
+      <div class="hero">
+        <div class="hero-inner">
+          <span class="eyebrow">Family history, made simple</span>
+          <h1 id="home-title">Every family has a <em>story</em>. Keep yours.</h1>
+          <p>Build your family tree, save the stories and traditions you grew up with, and see on a globe where your people came from.</p>
+          <div class="hero-actions">
+            <a class="btn btn-gold" href="#add">Start your tree</a>
+            <a class="btn btn-ghost" href="#globe">Explore the globe</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">Everything in one place</h2>
+        <p class="section-lead">Five simple tools to remember the people who made you.</p>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🌳</div>
+            <h3>Family tree</h3>
+            <p>An interactive tree that shows who is related and how.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">👤</div>
+            <h3>Profiles</h3>
+            <p>Names, birthdays, photos and short biographies.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🕰️</div>
+            <h3>Memory timeline</h3>
+            <p>Milestones and historical dates in order.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">📖</div>
+            <h3>Story archive</h3>
+            <p>Save traditions, recipes and memories before they fade.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🌍</div>
+            <h3>Family globe</h3>
+            <p>Spin the globe to see where relatives were born and lived.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="section" style="padding-top:0">
+        <h2 class="section-title">How it works</h2>
+        <p class="section-lead">Three steps. No account needed to look around.</p>
+        <ol class="steps">
+          <li><strong>Add a person</strong>Start with yourself, then add parents, siblings and cousins.</li>
+          <li><strong>Watch the tree grow</strong>Click anyone to read their profile, timeline and stories.</li>
+          <li><strong>Find your roots</strong>Rotate the globe to see where everyone's journey began.</li>
+        </ol>
+        <div class="cta-band">
+          <h2>Ready to meet your family?</h2>
+          <p>It takes about a minute to add your first relative.</p>
+          <a class="btn btn-gold" href="#add">Add the first person</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 2. ADD FAMILY ===================== -->
+    <section id="view-add" class="view section" aria-labelledby="add-title" hidden>
+      <h2 id="add-title" class="section-title">Add a family member</h2>
+      <p class="section-lead">Fill in what you know. Only the name is required, and you can edit the rest later.</p>
+
+      <div class="add-layout">
+        <form id="member-form" class="card" data-api="/api/members" novalidate>
+          <div class="form-grid">
+            <div class="field full">
+              <label for="name">Full name <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+              <input id="name" name="name" type="text" autocomplete="off" required placeholder="e.g. Grace Mensah">
+            </div>
+
+            <div class="field">
+              <label for="birthDate">Birth date <span class="hint">(optional)</span></label>
+              <input id="birthDate" name="birthDate" type="date">
+            </div>
+            <div class="field">
+              <label for="deathDate">Death date <span class="hint">(if passed)</span></label>
+              <input id="deathDate" name="deathDate" type="date">
+            </div>
+
+            <div class="field">
+              <label for="birthPlace">Birthplace</label>
+              <input id="birthPlace" name="birthPlace" type="text" placeholder="City, Country">
+            </div>
+            <div class="field">
+              <label for="livedPlace">Place they lived</label>
+              <input id="livedPlace" name="livedPlace" type="text" placeholder="City, Country">
+            </div>
+
+            <div class="field">
+              <label for="relationship">Relationship</label>
+              <select id="relationship" name="relationship">
+                <option value="">Choose one…</option>
+                <option>Me</option>
+                <option>Parent</option>
+                <option>Child</option>
+                <option>Spouse / partner</option>
+                <option>Sibling</option>
+                <option>Grandparent</option>
+                <option>Grandchild</option>
+                <option>Aunt / Uncle</option>
+                <option>Cousin</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="relatedTo">Related to</label>
+              <select id="relatedTo" name="relatedTo">
+                <option value="">Nobody yet (first person)</option>
+                <option value="1">Amara Okafor</option>
+                <option value="2">David Okafor</option>
+              </select>
+            </div>
+
+            <div class="field full">
+              <label for="photo">Photo <span class="hint">(optional, JPG or PNG)</span></label>
+              <input id="photo" name="photo" type="file" accept="image/*">
+            </div>
+
+            <div class="field full">
+              <label for="bio">Short biography</label>
+              <textarea id="bio" name="bio" placeholder="Where they grew up, what they loved, what they were known for…"></textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn" type="submit">Save family member</button>
+            <a class="btn btn-ghost" href="#tree">View the tree</a>
+          </div>
+          <p id="member-message" class="form-message" role="status" aria-live="polite" hidden></p>
+        </form>
+
+        <aside class="card preview-card" aria-labelledby="preview-title">
+          <h3 id="preview-title">Live preview</h3>
+          <div id="preview-avatar" class="avatar large" aria-hidden="true">?</div>
+          <p><strong id="preview-name">Their name</strong></p>
+          <p id="preview-dates" class="preview-meta">Birth – Death</p>
+          <p id="preview-place" class="preview-meta">📍 Place</p>
+          <p id="preview-bio" class="preview-bio">Their biography will appear here as you type.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ===================== 3. FAMILY TREE ===================== -->
+    <section id="view-tree" class="view" aria-labelledby="tree-title" hidden>
+      <div class="tree-layout">
+
+        <div class="tree-stage">
+          <div class="tree-toolbar">
+            <h2 id="tree-title">Your family tree</h2>
+            <a class="btn btn-small" href="#add">+ Add person</a>
+          </div>
+
+          <div id="tree-container" class="tree" aria-label="Family tree. Select a person to see their profile.">
+            <!-- Sample tree. Replace with people from the API. -->
+            <ul>
+              <li>
+                <div class="couple">
+                  <button class="node" type="button" data-id="1" aria-pressed="false">
+                    <span class="avatar small" aria-hidden="true">AO</span>
+                    <span class="node-name">Amara Okafor</span>
+                    <span class="node-years">1938 – 2012</span>
+                  </button>
+                  <span class="couple-link" aria-label="married to">♥</span>
+                  <button class="node" type="button" data-id="2" aria-pressed="false">
+                    <span class="avatar small" aria-hidden="true">DO</span>
+                    <span class="node-name">David Okafor</span>
+                    <span class="node-years">1935 – 2008</span>
+                  </button>
+                </div>
+                <ul>
+                  <li>
+                    <div class="couple">
+                      <button class="node" type="button" data-id="3" aria-pressed="false">
+                        <span class="avatar small" aria-hidden="true">GO</span>
+                        <span class="node-name">Grace Okafor</span>
+                        <span class="node-years">1964 –</span>
+                      </button>
+                      <span class="couple-link" aria-label="married to">♥</span>
+                      <button class="node" type="button" data-id="4" aria-pressed="false">
+                        <span class="avatar small" aria-hidden="true">JL</span>
+                        <span class="node-name">James Lin</span>
+                        <span class="node-years">1962 –</span>
+                      </button>
+                    </div>
+                    <ul>
+                      <li>
+                        <button class="node" type="button" data-id="5" aria-pressed="false">
+                          <span class="avatar small" aria-hidden="true">ML</span>
+                          <span class="node-name">Maya Lin</span>
+                          <span class="node-years">1992 –</span>
+                        </button>
+                      </li>
+                      <li>
+                        <button class="node" type="button" data-id="6" aria-pressed="false">
+                          <span class="avatar small" aria-hidden="true">EL</span>
+                          <span class="node-name">Ethan Lin</span>
+                          <span class="node-years">1996 –</span>
+                        </button>
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <button class="node" type="button" data-id="7" aria-pressed="false">
+                      <span class="avatar small" aria-hidden="true">SO</span>
+                      <span class="node-name">Samuel Okafor</span>
+                      <span class="node-years">1968 –</span>
+                    </button>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <aside class="side-panel" aria-label="Family details">
+          <div class="tabs" role="tablist" aria-label="Side panel sections">
+            <button class="tab" role="tab" id="tab-profile" aria-controls="panel-profile" aria-selected="true" type="button">Profile</button>
+            <button class="tab" role="tab" id="tab-add" aria-controls="panel-add" aria-selected="false" tabindex="-1" type="button">Add</button>
+            <button class="tab" role="tab" id="tab-timeline" aria-controls="panel-timeline" aria-selected="false" tabindex="-1" type="button">Timeline</button>
+            <button class="tab" role="tab" id="tab-stories" aria-controls="panel-stories" aria-selected="false" tabindex="-1" type="button">Stories</button>
+          </div>
+
+          <!-- Profile -->
+          <div class="tab-panel" role="tabpanel" id="panel-profile" aria-labelledby="tab-profile" tabindex="0">
+            <div class="profile-head">
+              <div id="profile-avatar" class="avatar large" aria-hidden="true">?</div>
+              <h3 id="profile-name">Select a person</h3>
+              <p id="profile-dates" class="preview-meta">Click anyone in the tree.</p>
+            </div>
+            <dl class="profile-facts">
+              <div><dt>Place</dt><dd id="profile-place">—</dd></div>
+              <div><dt>Relation</dt><dd id="profile-relation">—</dd></div>
+              <div><dt>About</dt><dd id="profile-bio">—</dd></div>
+            </dl>
+          </div>
+
+          <!-- Quick add -->
+          <div class="tab-panel" role="tabpanel" id="panel-add" aria-labelledby="tab-add" tabindex="0" hidden>
+            <form id="quick-form" data-api="/api/members" novalidate>
+              <div class="form-grid" style="grid-template-columns:1fr">
+                <div class="field">
+                  <label for="quickName">Full name <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                  <input id="quickName" name="name" type="text" required autocomplete="off">
+                </div>
+                <div class="field">
+                  <label for="quickBirth">Birth date</label>
+                  <input id="quickBirth" name="birthDate" type="date">
+                </div>
+                <div class="field">
+                  <label for="quickPlace">Birthplace</label>
+                  <input id="quickPlace" name="birthPlace" type="text" placeholder="City, Country">
+                </div>
+                <div class="field">
+                  <label for="quickRelationship">Relationship</label>
+                  <select id="quickRelationship" name="relationship">
+                    <option value="">Choose one…</option>
+                    <option>Parent</option>
+                    <option>Child</option>
+                    <option>Spouse / partner</option>
+                    <option>Sibling</option>
+                    <option>Grandparent</option>
+                    <option>Cousin</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="quickRelatedTo">Related to</label>
+                  <select id="quickRelatedTo" name="relatedTo">
+                    <option value="">Choose a person…</option>
+                    <option value="1">Amara Okafor</option>
+                    <option value="2">David Okafor</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button class="btn" type="submit">Add to tree</button>
+              </div>
+              <p id="quick-message" class="form-message" role="status" aria-live="polite" hidden></p>
+            </form>
+          </div>
+
+          <!-- Timeline -->
+          <div class="tab-panel" role="tabpanel" id="panel-timeline" aria-labelledby="tab-timeline" tabindex="0" hidden>
+            <h3>Memory timeline</h3>
+            <ol id="timeline-list" class="timeline">
+              <li><time datetime="1938">1938</time><p>Amara Okafor is born in Enugu, Nigeria.</p></li>
+              <li><time datetime="1960">1960</time><p>Nigeria gains independence. The family celebrates in the street.</p></li>
+              <li><time datetime="1964">1964</time><p>Grace Okafor is born.</p></li>
+              <li><time datetime="1989">1989</time><p>Grace moves to Toronto, Canada.</p></li>
+              <li><time datetime="1992">1992</time><p>Maya Lin is born.</p></li>
+            </ol>
+          </div>
+
+          <!-- Stories -->
+          <div class="tab-panel" role="tabpanel" id="panel-stories" aria-labelledby="tab-stories" tabindex="0" hidden>
+            <h3>Story archive</h3>
+            <div id="stories-list">
+              <article class="story">
+                <h4>Sunday jollof</h4>
+                <small>Told by Grace · Tradition</small>
+                <p>Every Sunday Grandma Amara cooked jollof rice for the whole street. Nobody was ever turned away.</p>
+              </article>
+              <article class="story">
+                <h4>The long trip north</h4>
+                <small>Told by Samuel · Memory</small>
+                <p>The first time the family drove across the country, the car broke down three times before lunch.</p>
+              </article>
+            </div>
+            <a class="btn btn-small btn-ghost" href="#add">+ Add a story (coming soon)</a>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ===================== 4. GLOBE ===================== -->
+    <section id="view-globe" class="view globe-view" aria-labelledby="globe-title" hidden>
+      <div id="globe-container" aria-hidden="true"></div>
+
+      <div class="globe-overlay">
+        <h2 id="globe-title">The family globe</h2>
+        <p>Drag to rotate, scroll to zoom, and click a glowing point. Every line leads back to Africa, where all of our family trees begin.</p>
+        <div class="globe-controls">
+          <button id="globe-toggle" class="btn btn-small btn-gold" type="button" aria-pressed="false">Pause rotation</button>
+          <button id="globe-reset" class="btn btn-small btn-ghost" type="button">Reset view</button>
+        </div>
+      </div>
+
+      <aside id="globe-info" class="globe-info" hidden aria-live="polite">
+        <button id="globe-info-close" class="close" type="button" aria-label="Close details">×</button>
+        <h3 id="globe-info-title">Place</h3>
+        <p id="globe-info-text"></p>
+        <a class="btn btn-small" href="#add">Add family from here</a>
+      </aside>
+
+      <div class="globe-spacer" aria-hidden="true"></div>
+      <div class="globe-list">
+        <h3>Places on the globe</h3>
+        <p style="color:#d9d4c4;font-size:.95rem;margin:0">Prefer a list? Choose a place to read about it.</p>
+        <ul id="globe-list"></ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>Mycelium · Built for a family hackathon · All human family trees trace back to Africa. 🌍</p>
+  </footer>
+
+  <script src="https://unpkg.com/globe.gl"></script>
+
+  <script src="script.js"></script>
+</body>
+</html>
