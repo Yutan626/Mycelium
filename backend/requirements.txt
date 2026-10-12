@@ -1,0 +1,9 @@
+# Mycelium backend dependencies.
+# Install into backend/venv with:
+#   backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+Django==6.1.2
+djangorestframework==3.18.3
+django-cors-headers==4.9.0
+mysqlclient==2.3.0
+python-dotenv==1.2.4
+groq==1.7.0
