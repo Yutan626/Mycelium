@@ -102,35 +102,51 @@ ASGI_APPLICATION = "config.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 #
-# Mycelium uses MySQL. All connection details must be supplied through the
-# environment so that a missing/misconfigured setup fails loudly instead of
-# silently connecting to an unintended database.
+# SQLite is the project's database. It needs no server and no credentials:
+# normal local development works out of the box with backend/db.sqlite3.
+#
+# MySQL remains available as an explicitly opt-in alternative for future
+# deployment work: set DB_ENGINE=mysql and provide the DB_* credentials.
+# Nothing MySQL-related is required (or contacted) unless opted in.
 
-# Passwords may legitimately be empty for a local MySQL install, so only the
-# remaining connection details are required here.
-REQUIRED_DB_VARS = ["DB_NAME", "DB_USER", "DB_HOST", "DB_PORT"]
-_missing_db_vars = [name for name in REQUIRED_DB_VARS if not os.getenv(name)]
-if _missing_db_vars:
-    raise ImproperlyConfigured(
-        "Missing required MySQL environment variables: "
-        + ", ".join(_missing_db_vars)
-        + ".\nCopy backend/.env.example to backend/.env, create the MySQL "
-        "database, and fill in your local credentials before running Django."
-    )
+DB_ENGINE = os.getenv("DB_ENGINE", "sqlite").strip().lower()
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT"),
-        "OPTIONS": {
-            "charset": "utf8mb4",
-        },
+if DB_ENGINE == "mysql":
+    REQUIRED_DB_VARS = ["DB_NAME", "DB_USER", "DB_HOST", "DB_PORT"]
+    _missing_db_vars = [name for name in REQUIRED_DB_VARS if not os.getenv(name)]
+    if _missing_db_vars:
+        raise ImproperlyConfigured(
+            "DB_ENGINE=mysql but required MySQL environment variables are "
+            "missing: "
+            + ", ".join(_missing_db_vars)
+            + ".\nFill in backend/.env (see backend/.env.example) and make "
+            "sure the MySQL server is running."
+        )
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": os.getenv("DB_NAME"),
+            "USER": os.getenv("DB_USER"),
+            # Passwords may legitimately be empty for a local MySQL install.
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": os.getenv("DB_HOST"),
+            "PORT": os.getenv("DB_PORT"),
+            "OPTIONS": {
+                "charset": "utf8mb4",
+            },
+        }
     }
-}
+elif DB_ENGINE == "sqlite":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    raise ImproperlyConfigured(
+        f'Unsupported DB_ENGINE="{DB_ENGINE}". Use "sqlite" or "mysql".'
+    )
 
 
 # Password validation
@@ -203,7 +219,8 @@ REST_FRAMEWORK = {
 }
 
 
-# Groq (future AI story helper)
+# Groq (AI story helper)
 # The key is optional so the application starts and serves health checks
 # even when no Groq key is configured. It is only ever read by backend code.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")

@@ -7,3 +7,4 @@ django-cors-headers==4.9.0
 mysqlclient==2.3.0
 python-dotenv==1.2.4
 groq==1.7.0
+Pillow==12.3.0
