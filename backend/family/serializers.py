@@ -9,10 +9,20 @@ The frontend submits ``FormData`` where empty inputs arrive as ``""``. The
 that "no value" validates cleanly instead of failing date/integer parsing.
 """
 
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.urls import reverse
 from rest_framework import serializers
 
-from .models import FamilyEvent, FamilyMember, FamilyStory
+from .models import (
+    FamilyEvent,
+    FamilyMember,
+    FamilyStory,
+    RelativeConnection,
+)
 
 
 class EmptyStringToNoneMixin:
@@ -36,6 +46,30 @@ class EmptyStringToNoneMixin:
             if value == "":
                 data[key] = None
         return super().to_internal_value(data)
+
+
+class OwnedMemberReferencesMixin:
+    """Narrow member-reference querysets to the requesting user's members.
+
+    Cross-account IDs then fail with the same generic "invalid pk" error as
+    nonexistent IDs, so update/create paths cannot probe other users' trees.
+    Without an authenticated request context, nothing is selectable.
+    """
+
+    owned_member_fields = ()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            queryset = FamilyMember.objects.filter(owner=user)
+        else:
+            queryset = FamilyMember.objects.none()
+        for name in self.owned_member_fields:
+            field = self.fields[name]
+            target = getattr(field, "child_relation", field)
+            target.queryset = queryset
 
 
 class OptionalMemberField(serializers.PrimaryKeyRelatedField):
@@ -90,8 +124,11 @@ def apply_relationship_hint(member):
             safe_add(parent.parents, member)
 
 
-class FamilyMemberSerializer(EmptyStringToNoneMixin, serializers.ModelSerializer):
+class FamilyMemberSerializer(
+    OwnedMemberReferencesMixin, EmptyStringToNoneMixin, serializers.ModelSerializer
+):
     empty_to_none_keys = ("birthDate", "deathDate", "relatedTo")
+    owned_member_fields = ("relatedTo", "parents", "partners")
 
     birthDate = serializers.DateField(
         source="birth_date", required=False, allow_null=True
@@ -154,11 +191,13 @@ class FamilyMemberSerializer(EmptyStringToNoneMixin, serializers.ModelSerializer
     def get_photoUrl(self, obj):
         if not obj.photo:
             return None
+        # Photos are served through an ownership-checked endpoint, never
+        # through a public media URL.
+        path = reverse("family:member-photo", kwargs={"pk": obj.pk})
         request = self.context.get("request")
-        url = obj.photo.url
         if request is not None:
-            return request.build_absolute_uri(url)
-        return url
+            return request.build_absolute_uri(path)
+        return path
 
     def validate(self, attrs):
         birth = attrs.get(
@@ -218,8 +257,11 @@ class FamilyMemberSerializer(EmptyStringToNoneMixin, serializers.ModelSerializer
         return member
 
 
-class FamilyEventSerializer(EmptyStringToNoneMixin, serializers.ModelSerializer):
+class FamilyEventSerializer(
+    OwnedMemberReferencesMixin, EmptyStringToNoneMixin, serializers.ModelSerializer
+):
     empty_to_none_keys = ("memberId", "year")
+    owned_member_fields = ("memberId",)
 
     memberId = OptionalMemberField(source="member", queryset=FamilyMember.objects.all())
     year = serializers.IntegerField(required=False, allow_null=True)
@@ -229,8 +271,11 @@ class FamilyEventSerializer(EmptyStringToNoneMixin, serializers.ModelSerializer)
         fields = ["id", "memberId", "year", "text"]
 
 
-class FamilyStorySerializer(EmptyStringToNoneMixin, serializers.ModelSerializer):
+class FamilyStorySerializer(
+    OwnedMemberReferencesMixin, EmptyStringToNoneMixin, serializers.ModelSerializer
+):
     empty_to_none_keys = ("memberId",)
+    owned_member_fields = ("memberId",)
 
     memberId = OptionalMemberField(source="member", queryset=FamilyMember.objects.all())
 
@@ -254,3 +299,123 @@ class StoryHelperSerializer(serializers.Serializer):
         if not value.strip():
             raise serializers.ValidationError("Story text is required.")
         return value.strip()
+
+
+class RegisterSerializer(serializers.Serializer):
+    """Account registration. Passwords are hashed by Django, never stored."""
+
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
+    password = serializers.CharField(write_only=True, min_length=8, max_length=128)
+    password2 = serializers.CharField(write_only=True)
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError(
+                "An account with that username already exists."
+            )
+        return value
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password2"]:
+            raise serializers.ValidationError(
+                {"password2": "The two passwords do not match."}
+            )
+        try:
+            validate_password(attrs["password"])
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)})
+        return attrs
+
+    def create(self, validated_data):
+        from .models import FamilyTree
+
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            password=validated_data["password"],
+        )
+        FamilyTree.objects.get_or_create(owner=user)
+        return user
+
+
+class LoginSerializer(serializers.Serializer):
+    """Credential check. Error is deliberately vague (no user enumeration)."""
+
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = authenticate(
+            request, username=attrs["username"], password=attrs["password"]
+        )
+        if user is None:
+            raise serializers.ValidationError("Invalid username or password.")
+        if not user.is_active:
+            raise serializers.ValidationError("This account is disabled.")
+        attrs["user"] = user
+        return attrs
+
+
+class RelativeConnectionSerializer(
+    OwnedMemberReferencesMixin, serializers.ModelSerializer
+):
+    owned_member_fields = ("from_member",)
+    from_user = serializers.CharField(source="from_user.username", read_only=True)
+    to_user = serializers.CharField(source="to_user.username", read_only=True)
+    to_username = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = RelativeConnection
+        fields = [
+            "id",
+            "from_user",
+            "to_user",
+            "to_username",
+            "from_member",
+            "note",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["status", "created_at", "updated_at"]
+        extra_kwargs = {
+            "note": {"required": False, "allow_blank": True},
+        }
+
+    def validate_to_username(self, value):
+        request = self.context.get("request")
+        try:
+            target = User.objects.get(username=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                "No registered user with that username."
+            )
+        if request is not None and target == request.user:
+            raise serializers.ValidationError("You cannot connect to yourself.")
+        return value
+
+    def validate(self, attrs):
+        from django.db.models import Q
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        target = User.objects.filter(username=attrs["to_username"]).first()
+        if user is not None and target is not None:
+            exists = RelativeConnection.objects.filter(
+                Q(from_user=user, to_user=target)
+                | Q(from_user=target, to_user=user)
+            ).exists()
+            if exists:
+                raise serializers.ValidationError(
+                    "A connection between these users already exists."
+                )
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        target = User.objects.get(username=validated_data.pop("to_username"))
+        return RelativeConnection.objects.create(
+            from_user=request.user, to_user=target, **validated_data
+        )
