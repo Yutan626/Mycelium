@@ -1,5 +1,33 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+
+
+class FamilyTree(models.Model):
+    """One personal tree per account (created automatically at registration).
+
+    Isolates future sharing/permission decisions: basic ownership lives on
+    the records themselves (``owner``), while this row anchors per-account
+    state such as the designated center person.
+    """
+
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="family_tree",
+    )
+    name = models.CharField(max_length=200, blank=True, default="")
+    center_member = models.ForeignKey(
+        "FamilyMember",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.owner}'s family tree"
 
 
 class FamilyMember(models.Model):
@@ -43,6 +71,15 @@ class FamilyMember(models.Model):
     ]
 
     name = models.CharField(max_length=200)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="family_members",
+        help_text="Account that owns this record. Null only for legacy rows "
+        "created before ownership existed; new records always set it.",
+    )
     birth_date = models.DateField(null=True, blank=True)
     death_date = models.DateField(null=True, blank=True)
     birth_place = models.CharField(max_length=200, blank=True)
@@ -114,6 +151,13 @@ class FamilyEvent(models.Model):
         on_delete=models.CASCADE,
         related_name="events",
     )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="family_events",
+    )
     year = models.IntegerField(null=True, blank=True)
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -148,6 +192,13 @@ class FamilyStory(models.Model):
         on_delete=models.CASCADE,
         related_name="stories",
     )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="family_stories",
+    )
     title = models.CharField(max_length=200)
     author = models.CharField(max_length=200, blank=True, default="")
     category = models.CharField(
@@ -161,3 +212,59 @@ class FamilyStory(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class RelativeConnection(models.Model):
+    """A deliberate relative link between two accounts.
+
+    Minimal, private-by-default foundation for a future request/approve
+    flow. Approving a connection records the link only — it grants no
+    viewing, edit, or delete rights, merges no trees, and exposes no
+    private records. Either account can remove the link at any time, which
+    deletes only the link, never the underlying family records.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="connections_sent",
+    )
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="connections_received",
+    )
+    from_member = models.ForeignKey(
+        FamilyMember,
+        on_delete=models.CASCADE,
+        related_name="connection_links",
+        help_text="The requester's own member record this link is about.",
+    )
+    note = models.CharField(max_length=200, blank=True, default="")
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["from_user", "to_user"],
+                name="unique_connection_per_user_pair",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.from_user} -> {self.to_user} ({self.status})"
