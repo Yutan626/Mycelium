@@ -57,9 +57,14 @@
     <nav class="main-nav" aria-label="Main">
       <ul>
         <li><a href="#home" data-nav="home">Home</a></li>
-        <li><a href="#add" data-nav="add">Add family</a></li>
+        <li id="nav-add-item" class="requires-own-tree"><a href="#add" data-nav="add">Add family</a></li>
         <li><a href="#tree" data-nav="tree">Family tree</a></li>
         <li><a href="#globe" data-nav="globe">Globe</a></li>
+        <li id="nav-connections-item"><a href="#connections" data-nav="connections">Connections</a></li>
+        <li id="nav-login-item"><a href="#login" data-nav="login">Log in</a></li>
+        <li id="nav-register-item"><a href="#register" data-nav="register">Register</a></li>
+        <li id="nav-user-item" hidden><span id="nav-user" class="nav-user"></span></li>
+        <li id="nav-logout-item" hidden><button id="nav-logout" type="button">Log out</button></li>
       </ul>
     </nav>
   </header>
@@ -134,7 +139,7 @@
       <p class="section-lead">Fill in what you know. Only the name is required, and you can edit the rest later.</p>
 
       <div class="add-layout">
-        <form id="member-form" class="card" data-api="/api/members" novalidate>
+        <form id="member-form" class="card requires-own-tree" data-api="/api/members" novalidate>
           <div class="form-grid">
             <div class="field full">
               <label for="name">Full name <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
@@ -218,6 +223,12 @@
       <div class="tree-layout">
 
         <div class="tree-stage">
+          <div id="shared-banner" class="card" hidden>
+            <p id="shared-banner-text"></p>
+            <div class="form-actions">
+              <button id="shared-back" class="btn btn-small" type="button">Back to my tree</button>
+            </div>
+          </div>
           <div class="tree-toolbar">
             <h2 id="tree-title">Your family tree</h2>
             <a class="btn btn-small" href="#add">+ Add person</a>
@@ -305,11 +316,18 @@
               <div><dt>Relation</dt><dd id="profile-relation">—</dd></div>
               <div><dt>About</dt><dd id="profile-bio">—</dd></div>
             </dl>
+            <div id="profile-actions" class="form-actions requires-own-tree" hidden>
+              <button id="profile-edit-btn" class="btn btn-small" type="button">Edit</button>
+              <button id="profile-delete-btn" class="btn btn-small btn-ghost" type="button">Delete</button>
+              <button id="profile-center-btn" class="btn btn-small btn-ghost" type="button" hidden>Make this the center of my tree</button>
+            </div>
+            <p id="profile-message" class="form-message" role="status" aria-live="polite" hidden></p>
+            <div id="profile-edit" hidden></div>
           </div>
 
           <!-- Quick add -->
           <div class="tab-panel" role="tabpanel" id="panel-add" aria-labelledby="tab-add" tabindex="0" hidden>
-            <form id="quick-form" data-api="/api/members" novalidate>
+            <form id="quick-form" class="requires-own-tree" data-api="/api/members" novalidate>
               <div class="form-grid" style="grid-template-columns:1fr">
                 <div class="field">
                   <label for="quickName">Full name <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
@@ -362,6 +380,29 @@
               <li><time datetime="1989">1989</time><p>Grace moves to Toronto, Canada.</p></li>
               <li><time datetime="1992">1992</time><p>Maya Lin is born.</p></li>
             </ol>
+            <form id="event-form" class="requires-own-tree" data-api="/api/events" novalidate>
+              <h4>Add an event</h4>
+              <div class="form-grid" style="grid-template-columns:1fr">
+                <div class="field">
+                  <label for="eventYear">Year <span class="hint">(optional)</span></label>
+                  <input id="eventYear" name="year" type="number" placeholder="e.g. 1964">
+                </div>
+                <div class="field">
+                  <label for="eventMember">Family member <span class="hint">(optional)</span></label>
+                  <select id="eventMember" name="memberId">
+                    <option value="">No one in particular</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="eventText">Event <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                  <textarea id="eventText" name="text" required placeholder="What happened?"></textarea>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-small" type="submit">Add event</button>
+              </div>
+              <p id="event-message" class="form-message" role="status" aria-live="polite" hidden></p>
+            </form>
           </div>
 
           <!-- Stories -->
@@ -379,7 +420,63 @@
                 <p>The first time the family drove across the country, the car broke down three times before lunch.</p>
               </article>
             </div>
-            <a class="btn btn-small btn-ghost" href="#add">+ Add a story (coming soon)</a>
+
+            <form id="story-form" class="requires-own-tree" data-api="/api/stories" novalidate>
+              <h4>Add a story</h4>
+              <div class="form-grid" style="grid-template-columns:1fr">
+                <div class="field">
+                  <label for="storyTitle">Title <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                  <input id="storyTitle" name="title" type="text" required autocomplete="off" placeholder="e.g. Sunday jollof">
+                </div>
+                <div class="field">
+                  <label for="storyAuthor">Told by <span class="hint">(optional)</span></label>
+                  <input id="storyAuthor" name="author" type="text" autocomplete="off" placeholder="Who told it?">
+                </div>
+                <div class="field">
+                  <label for="storyCategory">Category</label>
+                  <select id="storyCategory" name="category">
+                    <option>Memory</option>
+                    <option>Tradition</option>
+                    <option>Recipe</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="storyMember">About <span class="hint">(optional)</span></label>
+                  <select id="storyMember" name="memberId">
+                    <option value="">No one in particular</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="storyText">Story <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                  <textarea id="storyText" name="text" required placeholder="Tell it as you remember it…"></textarea>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-small" type="submit">Add story</button>
+              </div>
+              <p id="story-message" class="form-message" role="status" aria-live="polite" hidden></p>
+            </form>
+
+            <div class="card story-helper requires-own-tree" aria-labelledby="helper-title">
+              <h4 id="helper-title">Improve a story with AI</h4>
+              <p class="preview-meta">Paste a draft below. The suggestion appears separately — your text is never changed.</p>
+              <div class="field">
+                <label for="helper-text">Draft story text</label>
+                <textarea id="helper-text" placeholder="Paste or type a story draft…"></textarea>
+              </div>
+              <div class="form-actions">
+                <button id="helper-btn" class="btn btn-small" type="button">Improve with AI</button>
+              </div>
+              <p id="helper-message" class="form-message" role="status" aria-live="polite" hidden></p>
+              <div id="helper-result" hidden>
+                <h4>Suggestion</h4>
+                <p id="helper-output"></p>
+                <div class="form-actions">
+                  <button id="helper-copy" class="btn btn-small btn-ghost" type="button">Copy suggestion</button>
+                </div>
+              </div>
+            </div>
           </div>
         </aside>
       </div>
@@ -410,6 +507,105 @@
         <h3>Places on the globe</h3>
         <p style="color:#d9d4c4;font-size:.95rem;margin:0">Prefer a list? Choose a place to read about it.</p>
         <ul id="globe-list"></ul>
+      </div>
+    </section>
+
+    <!-- ===================== 5. LOG IN ===================== -->
+    <section id="view-login" class="view section" aria-labelledby="login-title" hidden>
+      <h2 id="login-title" class="section-title">Log in</h2>
+      <p class="section-lead">Log in to see your private family tree.</p>
+      <form id="login-form" class="card" data-api="/api/auth/login" novalidate>
+        <div class="form-grid" style="grid-template-columns:1fr">
+          <div class="field">
+            <label for="loginUsername">Username <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+            <input id="loginUsername" name="username" type="text" required autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="loginPassword">Password <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+            <input id="loginPassword" name="password" type="password" required autocomplete="current-password">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="submit">Log in</button>
+          <a class="btn btn-ghost" href="#register">Create an account</a>
+        </div>
+        <p class="preview-meta"><a href="http://127.0.0.1:8000/accounts/password_reset/">Forgot your password?</a></p>
+        <p id="login-message" class="form-message" role="status" aria-live="polite" hidden></p>
+      </form>
+    </section>
+
+    <!-- ===================== 6. REGISTER ===================== -->
+    <section id="view-register" class="view section" aria-labelledby="register-title" hidden>
+      <h2 id="register-title" class="section-title">Create your account</h2>
+      <p class="section-lead">One account keeps one private family tree.</p>
+      <form id="register-form" class="card" data-api="/api/auth/register" novalidate>
+        <div class="form-grid" style="grid-template-columns:1fr">
+          <div class="field">
+            <label for="registerUsername">Username <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+            <input id="registerUsername" name="username" type="text" required autocomplete="username" placeholder="e.g. maya92">
+          </div>
+          <div class="field">
+            <label for="registerEmail">Email <span class="hint">(optional)</span></label>
+            <input id="registerEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label for="registerPassword">Password <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+            <input id="registerPassword" name="password" type="password" required autocomplete="new-password" placeholder="At least 8 characters">
+          </div>
+          <div class="field">
+            <label for="registerPassword2">Confirm password <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+            <input id="registerPassword2" name="password2" type="password" required autocomplete="new-password">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="submit">Register</button>
+          <a class="btn btn-ghost" href="#login">Log in instead</a>
+        </div>
+        <p id="register-message" class="form-message" role="status" aria-live="polite" hidden></p>
+      </form>
+    </section>
+
+    <!-- ===================== 7. CONNECTIONS ===================== -->
+    <section id="view-connections" class="view section" aria-labelledby="connections-title" hidden>
+      <h2 id="connections-title" class="section-title">Relative connections</h2>
+      <p class="section-lead">Connect with relatives on Mycelium. The other person must approve, and nothing is shared until they explicitly allow it.</p>
+      <p id="connections-notice" class="preview-meta" role="status" hidden></p>
+      <div id="connections-signedout" class="card" hidden>
+        <p>Please log in to manage connections.</p>
+        <div class="form-actions">
+          <a class="btn btn-gold" href="#login">Log in</a>
+        </div>
+      </div>
+      <div id="connections-body" hidden>
+        <div class="card requires-own-tree">
+          <h3>Send a request</h3>
+          <form id="connection-form" data-api="/api/connections/" novalidate>
+            <div class="form-grid" style="grid-template-columns:1fr">
+              <div class="field">
+                <label for="connUsername">Their username <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                <input id="connUsername" name="to_username" type="text" required autocomplete="off" placeholder="Their exact username">
+              </div>
+              <div class="field">
+                <label for="connMember">About which of your members? <span class="req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                <select id="connMember" name="from_member">
+                  <option value="">Choose a person…</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="connNote">Note <span class="hint">(optional)</span></label>
+                <input id="connNote" name="note" type="text" maxlength="200" autocomplete="off" placeholder="How are you related?">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-small" type="submit">Send request</button>
+            </div>
+            <p id="connection-message" class="form-message" role="status" aria-live="polite" hidden></p>
+          </form>
+        </div>
+        <h3>Received requests</h3>
+        <div id="connections-received"></div>
+        <h3>Sent requests</h3>
+        <div id="connections-sent"></div>
       </div>
     </section>
 

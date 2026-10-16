@@ -254,6 +254,12 @@ class RelativeConnection(models.Model):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING
     )
+    grants_view = models.BooleanField(
+        default=False,
+        help_text="When set by the recipient, the requester may read (never "
+        "edit) the recipient's members, events, stories, places, and photos "
+        "through the shared endpoints. Revoking clears it.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

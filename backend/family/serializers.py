@@ -376,10 +376,11 @@ class RelativeConnectionSerializer(
             "from_member",
             "note",
             "status",
+            "grants_view",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["status", "created_at", "updated_at"]
+        read_only_fields = ["status", "grants_view", "created_at", "updated_at"]
         extra_kwargs = {
             "note": {"required": False, "allow_blank": True},
         }

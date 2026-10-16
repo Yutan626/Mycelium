@@ -148,6 +148,28 @@ img { max-width: 100%; display: block; }
   background: var(--green);
   color: #fff;
 }
+.main-nav button {
+  font: inherit;
+  cursor: pointer;
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  min-height: 44px;
+  line-height: 1.9;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brown);
+  font-weight: 500;
+}
+.main-nav button:hover { background: var(--gold-soft); }
+.nav-user {
+  display: inline-block;
+  padding: 0.55rem 0.25rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+body.shared-view .requires-own-tree { display: none !important; }
+#shared-banner { margin-bottom: 1rem; }
 
 /* ---------- Buttons ---------- */
 
