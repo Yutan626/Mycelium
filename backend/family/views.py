@@ -9,9 +9,11 @@ from django.http import FileResponse, JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
+from groq import APITimeoutError as GroqTimeoutError
 from groq import Groq
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from .gazetteer import resolve_place
@@ -290,14 +292,31 @@ class PlaceListView(APIView):
         return Response(places)
 
 
+class StoryHelperThrottle(UserRateThrottle):
+    """Per-account rate limit for AI generation (abuse + cost control)."""
+
+    scope = "storyhelper"
+
+    def get_rate(self):
+        # Read live from settings: DRF binds THROTTLE_RATES on the base
+        # class at import time, which would otherwise freeze the very first
+        # settings seen (breaking settings overrides in tests).
+        from rest_framework.settings import api_settings
+
+        return api_settings.DEFAULT_THROTTLE_RATES.get(self.scope)
+
+
 class StoryHelperView(APIView):
     """POST /api/storyhelper/ — AI-assisted story improvement via Groq.
 
     The Groq API key is read from the ``GROQ_API_KEY`` environment variable
     (backend only) and is never included in responses, logs, or frontend
     code. When no key is configured the endpoint answers 503 instead of
-    pretending to help.
+    pretending to help. Only the user's own submitted text is sent to the
+    provider — never another account's records.
     """
+
+    throttle_classes = [StoryHelperThrottle]
 
     def post(self, request):
         serializer = StoryHelperSerializer(data=request.data)
@@ -338,8 +357,16 @@ class StoryHelperView(APIView):
                 ],
                 temperature=0.7,
                 max_tokens=1024,
+                timeout=30,
             )
             improved = completion.choices[0].message.content
+        except GroqTimeoutError:
+            return Response(
+                {
+                    "detail": "The story helper timed out. Please try again later."
+                },
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
         except Exception:
             return Response(
                 {"detail": "Story helper request failed. Please try again later."},

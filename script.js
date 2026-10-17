@@ -1900,4 +1900,13 @@
     .catch(function () {})
     .then(refreshAuth)
     .then(function () { route(); });
+
+  // Back/forward-cache restores: the browser can resurrect this page with a
+  // previous account's UI intact. Re-validate the session so a restored page
+  // never shows stale private data (refreshAuth reloads on success and
+  // clears everything on failure).
+  window.addEventListener("pageshow", function (e) {
+    if (!e.persisted) return;
+    refreshAuth();
+  });
 })();

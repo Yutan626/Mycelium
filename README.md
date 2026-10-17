@@ -103,6 +103,17 @@ live integration test is still required before relying on it.
 7. Smoke test after deploy: HTTPS, login/logout, member create, photo
    download, health endpoint.
 
+### Groq API key (AI story helper)
+
+1. Create a free account at https://console.groq.com, open API Keys,
+   and create a key. It stays server-side: set `GROQ_API_KEY` in the
+   Render dashboard (locally: `backend/.env`, never committed).
+2. The default model is `openai/gpt-oss-20b` (a currently supported Groq
+   model; override with `GROQ_MODEL` if Groq retires it). The helper is
+   rate-limited to 20 requests/hour per account.
+3. Without a key the endpoint honestly answers 503 and the UI explains
+   the helper is unconfigured — everything else keeps working.
+
 ### Gmail App Passwords (for password reset delivery)
 
 1. Enable 2-Step Verification on the Gmail account, then create an App

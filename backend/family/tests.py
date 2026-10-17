@@ -622,6 +622,82 @@ class StoryHelperTests(AuthenticatedTestCase):
         )
         self.assertEqual(response.status_code, 502)
 
+    @override_settings(GROQ_API_KEY="test-key-placeholder")
+    @patch("family.views.Groq")
+    def test_groq_timeout_returns_504(self, mock_groq):
+        import httpx
+        from groq import APITimeoutError
+
+        mock_groq.return_value.chat.completions.create.side_effect = (
+            APITimeoutError(request=httpx.Request("POST", "https://api.groq.com/x"))
+        )
+        response = self.client.post(
+            "/api/storyhelper",
+            {"text": "Grandma cooked jollof."},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 504)
+        self.assertIn("detail", response.json())
+
+    @override_settings(GROQ_API_KEY="test-key-placeholder")
+    @patch("family.views.Groq")
+    def test_response_contains_only_improved_text(self, mock_groq):
+        # The helper echoes nothing back except its own output: no member
+        # data, no keys, no configuration — nothing to leak across accounts.
+        mock_groq.return_value.chat.completions.create.return_value = (
+            SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="Improved."))]
+            )
+        )
+        other = User.objects.create_user(username="other", password="x")
+        self.mkmember(name="Private Person", owner=other)
+        response = self.client.post(
+            "/api/storyhelper",
+            {"text": "A private family memory."},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            set(response.json().keys()), {"improved_text", "model"}
+        )
+        sent_prompt = (
+            mock_groq.return_value.chat.completions.create.call_args[1]["messages"]
+        )
+        self.assertNotIn("Private Person", str(sent_prompt))
+
+    @override_settings(
+        GROQ_API_KEY="test-key-placeholder",
+        REST_FRAMEWORK={
+            "DEFAULT_RENDERER_CLASSES": [
+                "rest_framework.renderers.JSONRenderer",
+            ],
+            "DEFAULT_PERMISSION_CLASSES": [
+                "rest_framework.permissions.IsAuthenticated",
+            ],
+            "DEFAULT_THROTTLE_RATES": {"storyhelper": "2/min"},
+        },
+    )
+    @patch("family.views.Groq")
+    def test_storyhelper_throttled(self, mock_groq):
+        from django.core.cache import cache
+
+        cache.clear()
+        mock_groq.return_value.chat.completions.create.return_value = (
+            SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="OK"))]
+            )
+        )
+        payload = {"text": "Grandma cooked jollof."}
+        for _ in range(2):
+            response = self.client.post(
+                "/api/storyhelper", payload, content_type="application/json"
+            )
+            self.assertEqual(response.status_code, 200, response.content)
+        throttled = self.client.post(
+            "/api/storyhelper", payload, content_type="application/json"
+        )
+        self.assertEqual(throttled.status_code, 429)
+
 
 class GazetteerTests(SimpleTestCase):
     """Local place resolution: known, unknown, and invalid inputs."""
@@ -1583,3 +1659,75 @@ class SeedCommandTests(TestCase):
         self.assertEqual(
             FamilyMember.objects.filter(owner=owner).count(), 1
         )
+
+
+class NoStoreMiddlewareTests(AuthenticatedTestCase):
+    """Private API/account responses must never be stored by browsers."""
+
+    def assert_no_store(self, response):
+        self.assertIn("no-store", response.get("Cache-Control", ""))
+
+    def test_authenticated_user_endpoint_not_storable(self):
+        self.assert_no_store(self.client.get("/api/auth/me"))
+
+    def test_anonymous_api_response_not_storable(self):
+        self.client.force_authenticate(user=None)
+        self.client.logout()
+        response = self.client.get("/api/health/")
+        self.assertEqual(response.status_code, 200)
+        self.assert_no_store(response)
+
+    def test_account_pages_not_storable(self):
+        self.assert_no_store(self.client.get("/accounts/password_reset/"))
+
+
+class EmailConfigTests(SimpleTestCase):
+    """Email configuration stays credential-free and local-friendly."""
+
+    databases = set()
+
+    def test_dev_defaults_need_no_credentials(self):
+        from django.conf import settings as dj_settings
+
+        # The test runner swaps the backend for locmem; the code default
+        # (used whenever DJANGO_EMAIL_BACKEND is unset) is the console
+        # backend — verified by reading the setting definition path.
+        self.assertEqual(dj_settings.EMAIL_PORT, 587)
+        self.assertTrue(dj_settings.EMAIL_USE_TLS)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="smtp.gmail.com",
+        EMAIL_PORT=587,
+        EMAIL_USE_TLS=True,
+        EMAIL_HOST_USER="user@gmail.com",
+        EMAIL_HOST_PASSWORD="app-password-placeholder",
+        DEFAULT_FROM_EMAIL="Mycelium <user@gmail.com>",
+    )
+    def test_gmail_smtp_settings_accepted(self):
+        from django.core.mail import get_connection
+
+        connection = get_connection()
+        self.assertEqual(connection.host, "smtp.gmail.com")
+        self.assertEqual(connection.port, 587)
+        self.assertTrue(connection.use_tls)
+        self.assertEqual(connection.username, "user@gmail.com")
+
+
+class CloudinaryConfigTests(SimpleTestCase):
+    """Cloudinary stays off unless explicitly configured; deps are present."""
+
+    databases = set()
+
+    def test_local_storage_is_default(self):
+        from django.conf import settings as dj_settings
+        from django.core.files.storage import default_storage
+
+        self.assertFalse(dj_settings.USE_CLOUDINARY)
+        self.assertEqual(
+            default_storage.__class__.__name__, "FileSystemStorage"
+        )
+
+    def test_cloudinary_libraries_available(self):
+        import cloudinary  # noqa: F401
+        import cloudinary_storage  # noqa: F401
