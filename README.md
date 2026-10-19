@@ -87,22 +87,18 @@ live integration test is still required before relying on it.
 ## Render deployment checklist
 
 1. In Render, choose **New > Blueprint**, connect this repository, and
-   deploy the root `render.yaml`. It creates the backend Web Service and
-   PostgreSQL database, generates `DJANGO_SECRET_KEY`, and wires the
-   database credentials and allowed host automatically. The frontend and
-   API share the backend origin. The start command applies database
-   migrations before launching the backend.
-2. The Blueprint selects Render's lowest paid PostgreSQL tier to avoid
-   the workspace's one-free-database limit and the free database's
-   30-day expiration. Review the current database price in Render before
-   approving the Blueprint. The web service remains on the free plan.
+   deploy the root `render.yaml`. It creates a free backend Web Service,
+   generates `DJANGO_SECRET_KEY`, and sets the allowed host automatically.
+   The frontend and API share the backend origin. The start command
+   applies database migrations before launching the backend.
+2. The free Web Service uses SQLite on Render's ephemeral filesystem.
+   The database and uploaded local photos can disappear after a restart,
+   spin-down, or redeploy. Use this only as a temporary demo; do not store
+   family data you need to keep.
 3. For persistent photo uploads, add `CLOUDINARY_URL` in the Render
    dashboard. Add `GROQ_API_KEY` there to enable the AI story helper;
    configure `EMAIL_*` only if real email delivery is needed.
-4. On a paid PostgreSQL plan, configure Render backups and take a manual
-   snapshot before migrations; rollback = redeploy the previous commit
-   and restore the snapshot.
-5. Smoke test after deploy: HTTPS, login/logout, member create, photo
+4. Smoke test after deploy: HTTPS, login/logout, member create, photo
    download, health endpoint.
 
 ### Groq API key (AI story helper)
