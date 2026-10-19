@@ -18,4 +18,30 @@ services:
           name: mycelium-backend
           property: host
       - key: DB_ENGINE
-        value: sqlite
+        value: postgresql
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: mycelium-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: mycelium-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: mycelium-db
+          property: password
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: mycelium-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: mycelium-db
+          property: port
+
+databases:
+  - name: mycelium-db
+    databaseName: mycelium
+    user: mycelium
+    plan: basic-256mb
