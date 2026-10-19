@@ -13,39 +13,9 @@
 <body>
 
   <!--
-  =====================================================================
-  HOOKS FOR BACKEND (server.js / script.js)
-  ---------------------------------------------------------------------
-  Everything lives in this one file. Four "views" are shown/hidden by
-  the URL hash:  #home  #add  #tree  #globe
-
-  FORMS
-    #member-form (Add page)      fields: name, birthDate, deathDate,
-                                 birthPlace, livedPlace, relationship,
-                                 relatedTo, photo, bio
-    #quick-form  (Tree side)     fields: name, birthDate, birthPlace,
-                                 relationship, relatedTo
-    Both have data-api="/api/members" (POST).
-
-  TREE
-    #tree-container   put nested <ul><li> with <button class="node"> here
-    #relatedTo / #quickRelatedTo   <select>s: fill with existing people
-
-  SIDE PANEL (Tree page)
-    #panel-profile  #panel-add  #panel-timeline  #panel-stories
-    #profile-name #profile-avatar #profile-dates #profile-place
-    #profile-relation #profile-bio
-    #timeline-list   <ul>   (GET /api/events)
-    #stories-list    <div>  (GET /api/stories)
-
-  GLOBE
-    #globe-container   (globe.gl renders here)
-    #globe-list        <ul> text version of the same places
-    GET /api/places should return [{ name, place, lat, lng }]
-
-  The small <script> at the bottom is a working demo of the above.
-  Move it into script.js and replace the sample data with fetch().
-  =====================================================================
+  Mycelium front end. One page, five views shown by the URL hash:
+  #home  #login  #add  #tree  #globe
+  script.js talks to the Django API (see API_BASE at the top of script.js).
   -->
 
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -60,9 +30,13 @@
         <li><a href="#add" data-nav="add">Add family</a></li>
         <li><a href="#tree" data-nav="tree">Family tree</a></li>
         <li><a href="#globe" data-nav="globe">Globe</a></li>
+        <li id="auth-item"><a href="#login" data-nav="login" id="auth-signin">Sign in</a></li>
+        <li id="auth-user" hidden><span class="who">Hi, <strong id="auth-name"></strong></span> <button type="button" id="auth-signout" class="linklike">Sign out</button></li>
       </ul>
     </nav>
   </header>
+
+  <div id="server-banner" class="banner" role="alert" hidden></div>
 
   <main id="main" tabindex="-1">
 
@@ -74,7 +48,7 @@
           <h1 id="home-title">Every family has a <em>story</em>. Keep yours.</h1>
           <p>Build your family tree, save the stories and traditions you grew up with, and see on a globe where your people came from.</p>
           <div class="hero-actions">
-            <a class="btn btn-gold" href="#add">Start your tree</a>
+            <a class="btn btn-gold" href="#add" data-needs-auth>Start your tree</a>
             <a class="btn btn-ghost" href="#globe">Explore the globe</a>
           </div>
         </div>
@@ -114,7 +88,7 @@
 
       <div class="section" style="padding-top:0">
         <h2 class="section-title">How it works</h2>
-        <p class="section-lead">Three steps. No account needed to look around.</p>
+        <p class="section-lead">Three steps. The globe is open to everyone; a free account keeps your tree private.</p>
         <ol class="steps">
           <li><strong>Add a person</strong>Start with yourself, then add parents, siblings and cousins.</li>
           <li><strong>Watch the tree grow</strong>Click anyone to read their profile, timeline and stories.</li>
@@ -125,6 +99,44 @@
           <p>It takes about a minute to add your first relative.</p>
           <a class="btn btn-gold" href="#add">Add the first person</a>
         </div>
+      </div>
+    </section>
+
+    <!-- ===================== 1b. SIGN IN ===================== -->
+    <section id="view-login" class="view section" aria-labelledby="login-title" hidden>
+      <div class="auth-card card">
+        <h2 id="login-title" class="section-title">Sign in to your family</h2>
+        <p class="section-lead" id="login-lead">Your tree is private to your account.</p>
+        <div class="auth-switch" role="group" aria-label="Sign in or create an account">
+          <button type="button" id="mode-login" class="seg on" aria-pressed="true">Sign in</button>
+          <button type="button" id="mode-register" class="seg" aria-pressed="false">Create account</button>
+        </div>
+        <form id="auth-form" novalidate>
+          <div class="form-grid" style="grid-template-columns:1fr">
+            <div class="field">
+              <label for="authUser">Username</label>
+              <input id="authUser" name="username" type="text" autocomplete="username" required>
+            </div>
+            <div class="field reg-only" hidden>
+              <label for="authEmail">Email <span class="hint">(optional)</span></label>
+              <input id="authEmail" name="email" type="email" autocomplete="email">
+            </div>
+            <div class="field">
+              <label for="authPass">Password</label>
+              <input id="authPass" name="password" type="password" autocomplete="current-password" required>
+              <span class="hint reg-only" hidden>At least 8 characters.</span>
+            </div>
+            <div class="field reg-only" hidden>
+              <label for="authPass2">Repeat password</label>
+              <input id="authPass2" name="password2" type="password" autocomplete="new-password">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn" type="submit" id="auth-submit">Sign in</button>
+            <button class="btn btn-ghost" type="button" id="demo-btn">Try the demo family</button>
+          </div>
+          <p id="auth-message" class="form-message" role="status" aria-live="polite" hidden></p>
+        </form>
       </div>
     </section>
 
@@ -160,28 +172,16 @@
             </div>
 
             <div class="field">
-              <label for="relationship">Relationship</label>
-              <select id="relationship" name="relationship">
-                <option value="">Choose one…</option>
-                <option>Me</option>
-                <option>Parent</option>
-                <option>Child</option>
-                <option>Spouse / partner</option>
-                <option>Sibling</option>
-                <option>Grandparent</option>
-                <option>Grandchild</option>
-                <option>Aunt / Uncle</option>
-                <option>Cousin</option>
-                <option>Other</option>
-              </select>
+              <label for="parentA">Parent 1 <span class="hint">(optional)</span></label>
+              <select id="parentA" name="parents"><option value="">None</option></select>
             </div>
             <div class="field">
-              <label for="relatedTo">Related to</label>
-              <select id="relatedTo" name="relatedTo">
-                <option value="">Nobody yet (first person)</option>
-                <option value="1">Amara Okafor</option>
-                <option value="2">David Okafor</option>
-              </select>
+              <label for="parentB">Parent 2 <span class="hint">(optional)</span></label>
+              <select id="parentB" name="parents"><option value="">None</option></select>
+            </div>
+            <div class="field full">
+              <label for="partnerSel">Spouse / partner <span class="hint">(optional)</span></label>
+              <select id="partnerSel" name="partners"><option value="">None</option></select>
             </div>
 
             <div class="field full">
@@ -224,64 +224,7 @@
           </div>
 
           <div id="tree-container" class="tree" aria-label="Family tree. Select a person to see their profile.">
-            <!-- Sample tree. Replace with people from the API. -->
-            <ul>
-              <li>
-                <div class="couple">
-                  <button class="node" type="button" data-id="1" aria-pressed="false">
-                    <span class="avatar small" aria-hidden="true">AO</span>
-                    <span class="node-name">Amara Okafor</span>
-                    <span class="node-years">1938 – 2012</span>
-                  </button>
-                  <span class="couple-link" aria-label="married to">♥</span>
-                  <button class="node" type="button" data-id="2" aria-pressed="false">
-                    <span class="avatar small" aria-hidden="true">DO</span>
-                    <span class="node-name">David Okafor</span>
-                    <span class="node-years">1935 – 2008</span>
-                  </button>
-                </div>
-                <ul>
-                  <li>
-                    <div class="couple">
-                      <button class="node" type="button" data-id="3" aria-pressed="false">
-                        <span class="avatar small" aria-hidden="true">GO</span>
-                        <span class="node-name">Grace Okafor</span>
-                        <span class="node-years">1964 –</span>
-                      </button>
-                      <span class="couple-link" aria-label="married to">♥</span>
-                      <button class="node" type="button" data-id="4" aria-pressed="false">
-                        <span class="avatar small" aria-hidden="true">JL</span>
-                        <span class="node-name">James Lin</span>
-                        <span class="node-years">1962 –</span>
-                      </button>
-                    </div>
-                    <ul>
-                      <li>
-                        <button class="node" type="button" data-id="5" aria-pressed="false">
-                          <span class="avatar small" aria-hidden="true">ML</span>
-                          <span class="node-name">Maya Lin</span>
-                          <span class="node-years">1992 –</span>
-                        </button>
-                      </li>
-                      <li>
-                        <button class="node" type="button" data-id="6" aria-pressed="false">
-                          <span class="avatar small" aria-hidden="true">EL</span>
-                          <span class="node-name">Ethan Lin</span>
-                          <span class="node-years">1996 –</span>
-                        </button>
-                      </li>
-                    </ul>
-                  </li>
-                  <li>
-                    <button class="node" type="button" data-id="7" aria-pressed="false">
-                      <span class="avatar small" aria-hidden="true">SO</span>
-                      <span class="node-name">Samuel Okafor</span>
-                      <span class="node-years">1968 –</span>
-                    </button>
-                  </li>
-                </ul>
-              </li>
-            </ul>
+            <p class="empty" id="tree-empty">Loading your family…</p>
           </div>
         </div>
 
@@ -324,26 +267,17 @@
                   <input id="quickPlace" name="birthPlace" type="text" placeholder="City, Country">
                 </div>
                 <div class="field">
-                  <label for="quickRelationship">Relationship</label>
-                  <select id="quickRelationship" name="relationship">
-                    <option value="">Choose one…</option>
-                    <option>Parent</option>
-                    <option>Child</option>
-                    <option>Spouse / partner</option>
-                    <option>Sibling</option>
-                    <option>Grandparent</option>
-                    <option>Cousin</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="quickRelatedTo">Related to</label>
-                  <select id="quickRelatedTo" name="relatedTo">
-                    <option value="">Choose a person…</option>
-                    <option value="1">Amara Okafor</option>
-                    <option value="2">David Okafor</option>
-                  </select>
-                </div>
+                <label for="quickParentA">Parent 1</label>
+                <select id="quickParentA" name="parents"><option value="">None</option></select>
+              </div>
+              <div class="field">
+                <label for="quickParentB">Parent 2</label>
+                <select id="quickParentB" name="parents"><option value="">None</option></select>
+              </div>
+              <div class="field">
+                <label for="quickPartner">Spouse / partner</label>
+                <select id="quickPartner" name="partners"><option value="">None</option></select>
+              </div>
               </div>
               <div class="form-actions">
                 <button class="btn" type="submit">Add to tree</button>
@@ -355,31 +289,62 @@
           <!-- Timeline -->
           <div class="tab-panel" role="tabpanel" id="panel-timeline" aria-labelledby="tab-timeline" tabindex="0" hidden>
             <h3>Memory timeline</h3>
-            <ol id="timeline-list" class="timeline">
-              <li><time datetime="1938">1938</time><p>Amara Okafor is born in Enugu, Nigeria.</p></li>
-              <li><time datetime="1960">1960</time><p>Nigeria gains independence. The family celebrates in the street.</p></li>
-              <li><time datetime="1964">1964</time><p>Grace Okafor is born.</p></li>
-              <li><time datetime="1989">1989</time><p>Grace moves to Toronto, Canada.</p></li>
-              <li><time datetime="1992">1992</time><p>Maya Lin is born.</p></li>
-            </ol>
+            <ol id="timeline-list" class="timeline"></ol>
+            <p id="timeline-empty" class="empty" hidden>No memories yet. Add the first one below.</p>
+            <details class="adder">
+              <summary>+ Add a memory</summary>
+              <form id="event-form" novalidate>
+                <div class="form-grid" style="grid-template-columns:1fr">
+                  <div class="field"><label for="evYear">Year <span class="hint">(optional)</span></label>
+                    <input id="evYear" name="year" type="number" min="0" max="2100" inputmode="numeric"></div>
+                  <div class="field"><label for="evText">What happened?</label>
+                    <textarea id="evText" name="text" required placeholder="e.g. Grace moves to Toronto"></textarea></div>
+                  <div class="field"><label for="evMember">Who is it about?</label>
+                    <select id="evMember" name="memberId"><option value="">Nobody in particular</option></select></div>
+                </div>
+                <div class="form-actions"><button class="btn btn-small" type="submit">Save memory</button></div>
+                <p id="event-message" class="form-message" role="status" aria-live="polite" hidden></p>
+              </form>
+            </details>
           </div>
 
           <!-- Stories -->
           <div class="tab-panel" role="tabpanel" id="panel-stories" aria-labelledby="tab-stories" tabindex="0" hidden>
             <h3>Story archive</h3>
-            <div id="stories-list">
-              <article class="story">
-                <h4>Sunday jollof</h4>
-                <small>Told by Grace · Tradition</small>
-                <p>Every Sunday Grandma Amara cooked jollof rice for the whole street. Nobody was ever turned away.</p>
-              </article>
-              <article class="story">
-                <h4>The long trip north</h4>
-                <small>Told by Samuel · Memory</small>
-                <p>The first time the family drove across the country, the car broke down three times before lunch.</p>
-              </article>
-            </div>
-            <a class="btn btn-small btn-ghost" href="#add">+ Add a story (coming soon)</a>
+            <div id="stories-list"></div>
+            <p id="stories-empty" class="empty" hidden>No stories yet. Save the first one below.</p>
+            <details class="adder">
+              <summary>+ Add a story</summary>
+              <form id="story-form" novalidate>
+                <div class="form-grid" style="grid-template-columns:1fr">
+                  <div class="field"><label for="stTitle">Title</label>
+                    <input id="stTitle" name="title" type="text" required placeholder="e.g. Sunday jollof"></div>
+                  <div class="field"><label for="stAuthor">Told by <span class="hint">(optional)</span></label>
+                    <input id="stAuthor" name="author" type="text"></div>
+                  <div class="field"><label for="stCategory">Kind of story</label>
+                    <select id="stCategory" name="category">
+                      <option>Memory</option><option>Tradition</option><option>Recipe</option><option>Other</option>
+                    </select></div>
+                  <div class="field"><label for="stMember">About <span class="hint">(optional)</span></label>
+                    <select id="stMember" name="memberId"><option value="">The whole family</option></select></div>
+                  <div class="field"><label for="stText">The story</label>
+                    <textarea id="stText" name="text" required rows="6"></textarea></div>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-small" type="submit">Save story</button>
+                  <button class="btn btn-small btn-gold" type="button" id="story-ai">✨ Improve with AI</button>
+                </div>
+                <div id="story-ai-result" class="ai-result" hidden>
+                  <p class="hint" id="story-ai-note">Here is a polished version. You decide whether to use it.</p>
+                  <div id="story-ai-text" class="ai-text"></div>
+                  <div class="form-actions">
+                    <button class="btn btn-small" type="button" id="story-ai-use">Use this version</button>
+                    <button class="btn btn-small btn-ghost" type="button" id="story-ai-dismiss">Keep mine</button>
+                  </div>
+                </div>
+                <p id="story-message" class="form-message" role="status" aria-live="polite" hidden></p>
+              </form>
+            </details>
           </div>
         </aside>
       </div>

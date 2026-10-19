@@ -1,2 +1,19 @@
+# secrets
 .env
+backend/.env
+
+# databases
+db.sqlite3
+backend/db.sqlite3
+
+# dependencies
 node_modules/
+
+# python junk
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# uploaded photos (private family photos)
+backend/media/

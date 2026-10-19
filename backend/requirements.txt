@@ -1,0 +1,15 @@
+# Mycelium backend dependencies.
+# Install into backend/venv with:
+#   backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+Django==6.1.2
+djangorestframework==3.18.3
+django-cors-headers==4.9.0
+python-dotenv==1.2.4
+groq==1.7.0
+Pillow==12.3.0
+# Production: PostgreSQL driver, static files, Cloudinary media.
+psycopg[binary]==3.3.6
+whitenoise==6.10.0
+cloudinary==1.44.1
+django-cloudinary-storage==0.3.0
+gunicorn==26.2.0
