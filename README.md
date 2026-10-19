@@ -89,8 +89,9 @@ live integration test is still required before relying on it.
 1. In Render, choose **New > Blueprint**, connect this repository, and
    deploy the root `render.yaml`. It creates the backend Web Service and
    PostgreSQL database, generates `DJANGO_SECRET_KEY`, and wires the
-   database credentials and allowed host automatically. The start command
-   applies database migrations before launching the backend.
+   database credentials and allowed host automatically. The frontend and
+   API share the backend origin. The start command applies database
+   migrations before launching the backend.
 2. The Blueprint currently selects Render's free plans for testing. The
    free PostgreSQL database expires after 30 days, has no backups, and is
    deleted after a further 14-day upgrade grace period. Do not store

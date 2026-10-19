@@ -17,11 +17,6 @@ services:
           type: web
           name: mycelium-backend
           property: host
-      - key: FRONTEND_ORIGIN
-        fromService:
-          type: web
-          name: mycelium-backend
-          property: url
       - key: DB_ENGINE
         value: postgresql
       - key: POSTGRES_DB
