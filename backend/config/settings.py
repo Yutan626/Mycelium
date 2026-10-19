@@ -188,6 +188,8 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+STATICFILES_DIRS = [BASE_DIR / "media"]
+
 # Media files (user uploads, e.g. family-member photos)
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
