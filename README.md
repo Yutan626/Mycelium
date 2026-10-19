@@ -92,11 +92,10 @@ live integration test is still required before relying on it.
    database credentials and allowed host automatically. The frontend and
    API share the backend origin. The start command applies database
    migrations before launching the backend.
-2. The Blueprint currently selects Render's free plans for testing. The
-   free PostgreSQL database expires after 30 days, has no backups, and is
-   deleted after a further 14-day upgrade grace period. Do not store
-   family data you need to keep in it. Choose a persistent paid database
-   plan before production use.
+2. The Blueprint selects Render's lowest paid PostgreSQL tier to avoid
+   the workspace's one-free-database limit and the free database's
+   30-day expiration. Review the current database price in Render before
+   approving the Blueprint. The web service remains on the free plan.
 3. For persistent photo uploads, add `CLOUDINARY_URL` in the Render
    dashboard. Add `GROQ_API_KEY` there to enable the AI story helper;
    configure `EMAIL_*` only if real email delivery is needed.

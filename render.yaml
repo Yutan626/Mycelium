@@ -44,4 +44,4 @@ databases:
   - name: mycelium-db
     databaseName: mycelium
     user: mycelium
-    plan: free
+    plan: basic-256mb
