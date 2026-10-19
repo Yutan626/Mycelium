@@ -1,14 +1,19 @@
 from django.contrib import admin
 from django.urls import include, path
-from django.http import JsonResponse
+from django.shortcuts import render
+from django.conf import settings
+from django.conf.urls.static import static
 
-# Simple view to show a message on the homepage
-def home_api_root(request):
-    return JsonResponse({"message": "Welcome to the Mycelium API Backend!"})
+# This function tells Django to load your index.html file
+def homepage_view(request):
+    return render(request, 'index.html')
 
 urlpatterns = [
-    path('', home_api_root),  # This fixes the 404 homepage error
+    path('', homepage_view),  # This forces your website to load on the main URL
     path('admin/', admin.site.urls),
     path('api/', include('family.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
 ]
+
+# This tells Django where to look for your script.js and style.css files
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
