@@ -84,23 +84,25 @@ PostgreSQL compatibility has only been statically checked here
 (`sqlmigrate` rendering); no live PostgreSQL server was available, so a
 live integration test is still required before relying on it.
 
-## Render deployment checklist (do not deploy without approval)
+## Render deployment checklist
 
-1. Create a Web Service from the repo (Python) and a PostgreSQL database.
-2. Build command: `pip install -r backend/requirements.txt`
-   (run from the repo root; then `python backend/manage.py collectstatic
-   --noinput` — WhiteNoise serves `backend/staticfiles/`).
-3. Start command: `gunicorn config.wsgi --chdir backend`
-   (`gunicorn` is pinned in requirements; WhiteNoise serves collected
-   static files).
-4. Dashboard environment: `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=False`,
-   `DJANGO_ALLOWED_HOSTS` (service domain), `FRONTEND_ORIGIN` (frontend
-   URL), `DB_ENGINE=postgresql` + `POSTGRES_*`, `DJANGO_SECURE=1`,
-   `CLOUDINARY_URL`, `EMAIL_*` (Gmail App Password), `GROQ_API_KEY`.
-5. Run migrations once: `python backend/manage.py migrate`.
-6. Backups: Render PostgreSQL automatic backups + manual snapshot before
-   each migrate; rollback = redeploy previous commit + restore snapshot.
-7. Smoke test after deploy: HTTPS, login/logout, member create, photo
+1. In Render, choose **New > Blueprint**, connect this repository, and
+   deploy the root `render.yaml`. It creates the backend Web Service and
+   PostgreSQL database, generates `DJANGO_SECRET_KEY`, and wires the
+   database credentials and allowed host automatically. The start command
+   applies database migrations before launching the backend.
+2. The Blueprint currently selects Render's free plans for testing. The
+   free PostgreSQL database expires after 30 days, has no backups, and is
+   deleted after a further 14-day upgrade grace period. Do not store
+   family data you need to keep in it. Choose a persistent paid database
+   plan before production use.
+3. For persistent photo uploads, add `CLOUDINARY_URL` in the Render
+   dashboard. Add `GROQ_API_KEY` there to enable the AI story helper;
+   configure `EMAIL_*` only if real email delivery is needed.
+4. On a paid PostgreSQL plan, configure Render backups and take a manual
+   snapshot before migrations; rollback = redeploy the previous commit
+   and restore the snapshot.
+5. Smoke test after deploy: HTTPS, login/logout, member create, photo
    download, health endpoint.
 
 ### Groq API key (AI story helper)
